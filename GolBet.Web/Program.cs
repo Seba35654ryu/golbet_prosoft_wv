@@ -7,18 +7,22 @@ using GolBet.Services.Interfaces;
 using GolBet.Services.Mapping;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using System.Globalization;
 
 var culture = new CultureInfo("es-CO");
 // Dates in Spanish; numbers neutral so model binding reads "2.5" correctly
 culture.NumberFormat = (NumberFormatInfo)CultureInfo.InvariantCulture.NumberFormat.Clone
     ();
-culture.NumberFormat.NumberGroupSeparator = "";   // "2,5" fails loudly, never binds as 25
+culture.NumberFormat.NumberGroupSeparator = "";   // "2,5" fails loudly, never binds as 25
 
 CultureInfo.DefaultThreadCurrentCulture = culture;
 CultureInfo.DefaultThreadCurrentUICulture = culture;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, config) =>
+    config.ReadFrom.Configuration(context.Configuration));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -80,13 +84,16 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    app.UseExceptionHandler("/Error/General");
 }
+
+// Status codes without a body (404 and friends): re-execute
+// the pipeline against our ErrorController
+app.UseStatusCodePagesWithReExecute("/Error/{0}");
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseSerilogRequestLogging();
 app.UseRouting();
 
 app.UseAuthentication();   // who are you?  (reads the cookie, builds User) 
